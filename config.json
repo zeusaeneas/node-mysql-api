@@ -4,7 +4,7 @@
     "port": 3306,
     "user": "root",
     "password": "zeus",
-    "database": "node_mysql_api"
+    "database": "node-mysql-api"
   },
   "secret": "myS3cur3S3cr3tKey20261",
   "emailFrom": "onboarding@resend.dev"
