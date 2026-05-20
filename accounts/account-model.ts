@@ -10,6 +10,8 @@ export default function model(sequelize: any) {
         acceptTerms: { type: DataTypes.BOOLEAN },
         role: { type: DataTypes.STRING, allowNull: false },
         verificationToken: { type: DataTypes.STRING },
+        // ADD THIS MISSING FIELD:
+        verificationTokenExpires: { type: DataTypes.DATE },
         verified: { type: DataTypes.DATE },
         resetToken: { type: DataTypes.STRING },
         resetTokenExpires: { type: DataTypes.DATE },
