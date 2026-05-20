@@ -1,14 +1,36 @@
-import nodemailer from 'nodemailer';
-import config from '../config.json';
+import { Resend } from 'resend';
 
-export default async function sendEmail({ to, subject, html, from = config.emailFrom }: any) {
-    try {
-        const transporter = nodemailer.createTransport(config.smtpOptions as any);
-        await transporter.verify(); // ← add this to test connection
-        const info = await transporter.sendMail({ from, to, subject, html });
-        console.log('Email sent:', info.messageId);
-    } catch (error) {
-        console.error('Email error:', error); // ← this will show in Render logs
-        throw error;
+// Initialize Resend with API key from environment variable
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+interface EmailOptions {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+}
+
+export default async function sendEmail({ to, subject, html, from = 'onboarding@resend.dev' }: EmailOptions) {
+  try {
+    console.log(`Attempting to send email to: ${to}`);
+    
+    const { data, error } = await resend.emails.send({
+      from: from, // Use 'onboarding@resend.dev' for testing, or your verified domain
+      to: to,
+      subject: subject,
+      html: html,
+    });
+
+    if (error) {
+      console.error('Resend API error:', error);
+      throw new Error(error.message);
     }
+
+    console.log('Email sent successfully! ID:', data?.id);
+    return { success: true, id: data?.id };
+    
+  } catch (error) {
+    console.error('Email error details:', error);
+    throw error;
+  }
 }
