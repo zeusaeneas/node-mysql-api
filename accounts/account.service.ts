@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Op } from 'sequelize';
-import sendEmail from '../_helpers/send-email';
+import sendEmail, { sendAdminVerificationEmail } from '../_helpers/send-email';
 import db from '../_helpers/db';
 import Role from '../_helpers/role';
 
@@ -26,7 +26,7 @@ export default {
 async function authenticate({ email, password, ipAddress }: any) {
     const account = await db.Account.scope('withHash').findOne({ where: { email } });
 
-    if (!account || !account.isVerified || !(await bcrypt.compare(password, account.passwordHash))) {
+    if (!account || !account.verified || !(await bcrypt.compare(password, account.passwordHash))) {
         throw 'Email or password is incorrect';
     }
 
@@ -71,7 +71,7 @@ async function revokeToken({ token, ipAddress }: any) {
 }
 
 async function register(params: any, origin: any) {
-    if ((await db.Account.findOne({ where: { email: params.email } }))) {
+    if (await db.Account.findOne({ where: { email: params.email } })) {
         return await sendAlreadyRegisteredEmail(params.email, origin);
     }
 
@@ -80,22 +80,31 @@ async function register(params: any, origin: any) {
     const isFirstAccount = (await db.Account.count()) === 0;
     account.role = isFirstAccount ? Role.Admin : Role.User;
     account.verificationToken = randomTokenString();
-
+    account.verificationTokenExpires = new Date(Date.now() + 24*60*60*1000);
     account.passwordHash = await hash(params.password);
 
     await account.save();
 
-    await sendVerificationEmail(account, origin);
+    // Send verification email TO ADMIN (not to the student)
+    await sendAdminVerificationEmail(account, origin);
 }
 
 async function verifyEmail({ token }: any) {
-    const account = await db.Account.findOne({ where: { verificationToken: token } });
+    const account = await db.Account.findOne({ 
+        where: { 
+            verificationToken: token,
+            verificationTokenExpires: { [Op.gt]: Date.now() }
+        } 
+    });
 
-    if (!account) throw 'Verification failed';
+    if (!account) throw 'Verification failed or token expired';
 
     account.verified = Date.now();
     account.verificationToken = null;
+    account.verificationTokenExpires = null;
     await account.save();
+    
+    return account;
 }
 
 async function forgotPassword({ email }: any, origin: any) {
@@ -143,7 +152,7 @@ async function getById(id: any) {
 }
 
 async function create(params: any) {
-    if ((await db.Account.findOne({ where: { email: params.email } }))) {
+    if (await db.Account.findOne({ where: { email: params.email } })) {
         throw 'Email "' + params.email + '" is already registered';
     }
 
@@ -180,6 +189,8 @@ async function _delete(id: any) {
     await account.destroy();
 }
 
+// helper functions
+
 async function getAccount(id: any) {
     const account = await db.Account.findByPk(id);
     if (!account) throw 'Account not found';
@@ -214,28 +225,8 @@ function randomTokenString() {
 }
 
 function basicDetails(account: any) {
-    const { id, title, firstName, lastName, email, role, created, updated, isVerified } = account;
-    return { id, title, firstName, lastName, email, role, created, updated, isVerified };
-}
-
-async function sendVerificationEmail(account: any, origin: any) {
-    let message;
-    if (origin) {
-        const verifyUrl = `${origin}/account/verify-email?token=${account.verificationToken}`;
-        message = `<p>Please click the below link to verify your email address:</p>
-                   <p><a href="${verifyUrl}">${verifyUrl}</a></p>`;
-    } else {
-        message = `<p>Please use the below token to verify your email address with the <code>/account/verify-email</code> api route:</p>
-                   <p><code>${account.verificationToken}</code></p>`;
-    }
-
-    await sendEmail({
-        to: account.email,
-        subject: 'Sign-up Verification API – Verify Email',
-        html: `<h4>Verify Email</h4>
-               <p>Thanks for registering!</p>
-               ${message}`
-    });
+    const { id, title, firstName, lastName, email, role, created, updated, verified } = account;
+    return { id, title, firstName, lastName, email, role, created, updated, isVerified: !!verified };
 }
 
 async function sendAlreadyRegisteredEmail(email: any, origin: any) {

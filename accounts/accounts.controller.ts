@@ -10,6 +10,7 @@ router.post('/authenticate', authenticateSchema, authenticate);
 router.post('/refresh-token', refreshToken);
 router.post('/revoke-token', authorize(), revokeTokenSchema, revokeToken);
 router.post('/register', registerSchema, register);
+router.get('/verify-student', verifyStudentHtml);
 router.post('/verify-email', verifyEmailSchema, verifyEmail);
 router.post('/forgot-password', forgotPasswordSchema, forgotPassword);
 router.post('/validate-reset-token', validateResetTokenSchema, validateResetToken);
@@ -89,8 +90,79 @@ function registerSchema(req: any, res: any, next: any) {
 
 function register(req: any, res: any, next: any) {
     accountService.register(req.body, req.get('origin'))
-        .then(() => res.json({ message: 'Registration successful, please check your email for verification instructions' }))
+        .then(() => res.json({ message: 'Registration submitted! The administrator will verify your account shortly.' }))
         .catch(next);
+}
+
+function verifyStudentHtml(req: any, res: any, next: any) {
+    try {
+        const { token, email } = req.query;
+        
+        if (!token || !email) {
+            return res.status(400).send(`
+                <!DOCTYPE html>
+                <html>
+                <head><title>Verification Failed</title></head>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                    <h1 style="color: #f44336;">❌ Invalid Verification Link</h1>
+                    <p>Missing verification token or email address.</p>
+                </body>
+                </html>
+            `);
+        }
+        
+        accountService.verifyEmail({ token })
+            .then(() => {
+                res.send(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Student Verified</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+                            .container { max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                            .success { color: #4CAF50; font-size: 64px; }
+                            h1 { color: #333; }
+                            .button { display: inline-block; padding: 12px 24px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="success">✓</div>
+                            <h1>Student Verified Successfully!</h1>
+                            <p>The student account for <strong>${email}</strong> has been verified.</p>
+                            <p>The student can now login to the portal.</p>
+                            <a href="${process.env.FRONTEND_URL || req.get('origin')}" class="button">Return to Portal</a>
+                        </div>
+                    </body>
+                    </html>
+                `);
+            })
+            .catch((error: any) => {
+                res.status(400).send(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head><title>Verification Failed</title></head>
+                    <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                        <h1 style="color: #f44336;">❌ Verification Failed</h1>
+                        <p>${error.message || 'Invalid or expired verification token'}</p>
+                        <p>The verification link may have expired (24 hour limit) or already been used.</p>
+                    </body>
+                    </html>
+                `);
+            });
+    } catch (error: any) {
+        res.status(400).send(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Verification Failed</title></head>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                <h1 style="color: #f44336;">❌ Verification Failed</h1>
+                <p>${error.message || 'Something went wrong'}</p>
+            </body>
+            </html>
+        `);
+    }
 }
 
 function verifyEmailSchema(req: any, res: any, next: any) {
