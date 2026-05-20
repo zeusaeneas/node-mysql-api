@@ -6,14 +6,14 @@
         "password": "zeus",
         "database": "node_mysql_api"
     },
-    "secret": "SUPER_SECRET_KEY_REPLACE_ME_IN_PRODUCTION",
-    "emailFrom": "info@my-node-api.com",
+    "secret": "myS3cur3S3cr3tKey2026!",
+    "emailFrom": "jeusaeneas#gmail.com",
     "smtpOptions": {
-        "host": "smtp.ethereal.email",
+        "host": "smtp.gmail.email",
         "port": 587,
         "auth": {
-            "user": "hadley.kohler@ethereal.email",
-            "pass": "8zV7Z21NpsGEh9vHBy"
+            "user": "jeusaeneas@gmail.com",
+            "pass": "agoulaporre1000"
         }
     }
 }
