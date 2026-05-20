@@ -1,5 +1,4 @@
 import { Resend } from 'resend';
-import config from '../config.json';
 
 // Initialize Resend with API key from environment variable
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -11,7 +10,7 @@ interface EmailOptions {
   from?: string;
 }
 
-export default async function sendEmail({ to, subject, html, from = config.emailFrom || 'onboarding@resend.dev' }: EmailOptions) {
+export default async function sendEmail({ to, subject, html, from = 'jeusaeneas@gmail.com' }: EmailOptions) {
   try {
     console.log(`Attempting to send email to: ${to}`);
     
