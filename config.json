@@ -10,7 +10,7 @@
     "emailFrom": "jeusaeneas@gmail.com",
     "smtpOptions": {
         "host": "smtp.gmail.com",
-        "port": 587,
+        "port": 465,
         "auth": {
             "user": "jeusaeneas@gmail.com",
             "pass": "qryvvhjtkgtcopoo"
