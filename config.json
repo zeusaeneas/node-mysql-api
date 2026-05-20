@@ -7,7 +7,7 @@
         "database": "node_mysql_api"
     },
     "secret": "myS3cur3S3cr3tKey2026!",
-    "emailFrom": "jeusaeneas#gmail.com",
+    "emailFrom": "jeusaeneas@gmail.com",
     "smtpOptions": {
         "host": "smtp.gmail.com",
         "port": 587,
