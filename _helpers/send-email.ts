@@ -27,7 +27,8 @@ export default async function sendEmail({ to, subject, html }: any) {
 export async function sendAdminVerificationEmail(account: any, origin: any) {
     // Use BACKEND_URL from environment variables
     const backendUrl = process.env.BACKEND_URL;
-    const verifyUrl = `${backendUrl}/verify-student?token=${account.verificationToken}&email=${account.email}`;
+    // NOTE: The route is '/accounts/verify-student' because server.ts mounts under '/accounts'
+    const verifyUrl = `${backendUrl}/accounts/verify-student?token=${account.verificationToken}&email=${account.email}`;
     
     const message = `
         <h2>New Student Registration Requires Verification</h2>
