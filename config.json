@@ -7,5 +7,6 @@
     "database": "node-mysql-api"
   },
   "secret": "myS3cur3S3cr3tKey20261",
-  "emailFrom": "onboarding@resend.dev"
+  "resendFrom": "onboarding@resend.dev",
+  "emailFrom": "jeusaeneas@gmail.com"
 }
