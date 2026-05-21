@@ -15,6 +15,8 @@ router.post('/verify-email', verifyEmailSchema, verifyEmail);
 router.post('/forgot-password', forgotPasswordSchema, forgotPassword);
 router.post('/validate-reset-token', validateResetTokenSchema, validateResetToken);
 router.post('/reset-password', resetPasswordSchema, resetPassword);
+router.get('/admin-reset-password', adminResetPasswordHtml);
+router.post('/admin-reset-password', adminResetPassword);
 router.get('/', authorize(Role.Admin), getAll);
 router.get('/:id', authorize(), getById);
 router.post('/', authorize(Role.Admin), createSchema, create);
@@ -187,7 +189,7 @@ function forgotPasswordSchema(req: any, res: any, next: any) {
 
 function forgotPassword(req: any, res: any, next: any) {
     accountService.forgotPassword(req.body, req.get('origin'))
-        .then(() => res.json({ message: 'Please check your email for password reset instructions' }))
+        .then(() => res.json({ message: 'Password reset request submitted. The administrator will process your request.' }))
         .catch(next);
 }
 
@@ -217,6 +219,120 @@ function resetPassword(req: any, res: any, next: any) {
     accountService.resetPassword(req.body)
         .then(() => res.json({ message: 'Password reset successful, you can now login' }))
         .catch(next);
+}
+
+function adminResetPasswordHtml(req: any, res: any, next: any) {
+    try {
+        const { token, email } = req.query;
+        
+        if (!token || !email) {
+            return res.status(400).send(`
+                <!DOCTYPE html>
+                <html>
+                <head><title>Password Reset Failed</title></head>
+                <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                    <h1 style="color: #f44336;">❌ Invalid Reset Link</h1>
+                    <p>Missing reset token or email address.</p>
+                </body>
+                </html>
+            `);
+        }
+        
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Reset Student Password</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+                    .container { max-width: 400px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+                    button { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+                    button:hover { background: #45a049; }
+                    .error { color: #f44336; }
+                    .success { color: #4CAF50; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h2>Reset Student Password</h2>
+                    <p><strong>Student Email:</strong> ${email}</p>
+                    <form id="resetForm">
+                        <input type="password" id="password" placeholder="New Password" required>
+                        <input type="password" id="confirmPassword" placeholder="Confirm New Password" required>
+                        <button type="submit">Reset Password</button>
+                    </form>
+                    <div id="message"></div>
+                </div>
+                <script>
+                    const backendUrl = '${process.env.BACKEND_URL}';
+                    document.getElementById('resetForm').onsubmit = async (e) => {
+                        e.preventDefault();
+                        const password = document.getElementById('password').value;
+                        const confirmPassword = document.getElementById('confirmPassword').value;
+                        const messageDiv = document.getElementById('message');
+                        
+                        if (password !== confirmPassword) {
+                            messageDiv.innerHTML = '<p class="error">Passwords do not match</p>';
+                            return;
+                        }
+                        
+                        if (password.length < 6) {
+                            messageDiv.innerHTML = '<p class="error">Password must be at least 6 characters</p>';
+                            return;
+                        }
+                        
+                        try {
+                            const response = await fetch('/accounts/admin-reset-password', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    token: '${token}',
+                                    email: '${email}',
+                                    newPassword: password
+                                })
+                            });
+                            
+                            const result = await response.json();
+                            
+                            if (response.ok) {
+                                messageDiv.innerHTML = '<p class="success">✅ Password reset successful! The student can now login with their new password.</p>';
+                                setTimeout(() => {
+                                    window.location.href = '${process.env.FRONTEND_URL || req.get('origin')}/login';
+                                }, 3000);
+                            } else {
+                                messageDiv.innerHTML = '<p class="error">❌ ' + result.message + '</p>';
+                            }
+                        } catch (error) {
+                            messageDiv.innerHTML = '<p class="error">❌ Something went wrong. Please try again.</p>';
+                        }
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+    } catch (error: any) {
+        res.status(400).send(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Password Reset Failed</title></head>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+                <h1 style="color: #f44336;">❌ Password Reset Failed</h1>
+                <p>${error.message || 'Invalid or expired reset token'}</p>
+            </body>
+            </html>
+        `);
+    }
+}
+
+async function adminResetPassword(req: any, res: any, next: any) {
+    try {
+        const { token, email, newPassword } = req.body;
+        const result = await accountService.adminResetPassword({ token, email, newPassword });
+        res.json({ message: 'Password reset successful' });
+    } catch (error: any) {
+        res.status(400).json({ message: error.message || 'Password reset failed' });
+    }
 }
 
 function getAll(req: any, res: any, next: any) {

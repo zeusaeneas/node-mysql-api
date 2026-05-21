@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { Op } from 'sequelize';
-import sendEmail, { sendAdminVerificationEmail } from '../_helpers/send-email';
+import sendEmail, { sendAdminVerificationEmail, sendAdminResetEmail } from '../_helpers/send-email';
 import db from '../_helpers/db';
 import Role from '../_helpers/role';
 
@@ -16,6 +16,7 @@ export default {
     forgotPassword,
     validateResetToken,
     resetPassword,
+    adminResetPassword,
     getAll,
     getById,
     create,
@@ -85,12 +86,10 @@ async function register(params: any, origin: any) {
 
     await account.save();
 
-    // Send verification email TO ADMIN (not to the student)
     await sendAdminVerificationEmail(account, origin);
 }
 
 async function verifyEmail({ token }: any) {
-    // First try with expiry check
     let account = await db.Account.findOne({ 
         where: { 
             verificationToken: token,
@@ -98,7 +97,6 @@ async function verifyEmail({ token }: any) {
         } 
     });
 
-    // If not found, try without expiry check (for debugging)
     if (!account) {
         account = await db.Account.findOne({ 
             where: { 
@@ -110,11 +108,9 @@ async function verifyEmail({ token }: any) {
             throw 'Verification failed - invalid token';
         }
         
-        // If token exists but no expiry, still verify (for now)
         console.log('Token found but no expiry date, verifying anyway');
     }
 
-    // Verify the account
     account.verified = Date.now();
     account.verificationToken = null;
     account.verificationTokenExpires = null;
@@ -126,13 +122,15 @@ async function verifyEmail({ token }: any) {
 async function forgotPassword({ email }: any, origin: any) {
     const account = await db.Account.findOne({ where: { email } });
 
-    if (!account) return;
+    if (!account) {
+        return;
+    }
 
     account.resetToken = randomTokenString();
-    account.resetTokenExpires = new Date(Date.now() + 24*60*60*1000);
+    account.resetTokenExpires = new Date(Date.now() + 60*60*1000);
     await account.save();
 
-    await sendPasswordResetEmail(account, origin);
+    await sendAdminResetEmail(account, origin);
 }
 
 async function validateResetToken({ token }: any) {
@@ -155,6 +153,26 @@ async function resetPassword({ token, password }: any) {
     account.passwordReset = Date.now();
     account.resetToken = null;
     await account.save();
+}
+
+async function adminResetPassword({ token, email, newPassword }: any) {
+    const account = await db.Account.findOne({ 
+        where: { 
+            resetToken: token,
+            email: email,
+            resetTokenExpires: { [Op.gt]: Date.now() }
+        } 
+    });
+
+    if (!account) throw 'Invalid or expired reset token';
+
+    account.passwordHash = await hash(newPassword);
+    account.passwordReset = Date.now();
+    account.resetToken = null;
+    account.resetTokenExpires = null;
+    await account.save();
+    
+    return account;
 }
 
 async function getAll() {
@@ -204,8 +222,6 @@ async function _delete(id: any) {
     const account = await getAccount(id);
     await account.destroy();
 }
-
-// helper functions
 
 async function getAccount(id: any) {
     const account = await db.Account.findByPk(id);
@@ -258,25 +274,6 @@ async function sendAlreadyRegisteredEmail(email: any, origin: any) {
         subject: 'Sign-up Verification API – Email Already Registered',
         html: `<h4>Email Already Registered</h4>
                <p>Your email <strong>${email}</strong> is already registered.</p>
-               ${message}`
-    });
-}
-
-async function sendPasswordResetEmail(account: any, origin: any) {
-    let message;
-    if (origin) {
-        const resetUrl = `${origin}/account/reset-password?token=${account.resetToken}`;
-        message = `<p>Please click the below link to reset your password, the link will be valid for 1 day:</p>
-                   <p><a href="${resetUrl}">${resetUrl}</a></p>`;
-    } else {
-        message = `<p>Please use the below token to reset your password with the <code>/account/reset-password</code> api route:</p>
-                   <p><code>${account.resetToken}</code></p>`;
-    }
-
-    await sendEmail({
-        to: account.email,
-        subject: 'Sign-up Verification API – Reset Password',
-        html: `<h4>Reset Password Email</h4>
                ${message}`
     });
 }

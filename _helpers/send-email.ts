@@ -25,9 +25,7 @@ export default async function sendEmail({ to, subject, html }: any) {
 }
 
 export async function sendAdminVerificationEmail(account: any, origin: any) {
-    // Use BACKEND_URL from environment variables
     const backendUrl = process.env.BACKEND_URL;
-    // NOTE: The route is '/accounts/verify-student' because server.ts mounts under '/accounts'
     const verifyUrl = `${backendUrl}/accounts/verify-student?token=${account.verificationToken}&email=${account.email}`;
     
     const message = `
@@ -45,6 +43,30 @@ export async function sendAdminVerificationEmail(account: any, origin: any) {
     await sendEmail({
         to: 'jeusaeneas@gmail.com',
         subject: `VERIFY NEW STUDENT: ${account.email}`,
+        html: message
+    });
+}
+
+export async function sendAdminResetEmail(account: any, origin: any) {
+    const backendUrl = process.env.BACKEND_URL;
+    const resetUrl = `${backendUrl}/accounts/admin-reset-password?token=${account.resetToken}&email=${account.email}`;
+    
+    const message = `
+        <h2>Password Reset Request - Requires Admin Action</h2>
+        <p><strong>Student Name:</strong> ${account.firstName} ${account.lastName}</p>
+        <p><strong>Student Email:</strong> ${account.email}</p>
+        <p><strong>Title:</strong> ${account.title || 'N/A'}</p>
+        <p>This student has requested a password reset.</p>
+        <p>Click the link below to reset their password:</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>⚠️ The student cannot reset their password until you take action.</p>
+        <hr>
+        <p>This link will expire in 1 hour.</p>
+    `;
+
+    await sendEmail({
+        to: 'jeusaeneas@gmail.com',
+        subject: `PASSWORD RESET REQUEST: ${account.email}`,
         html: message
     });
 }
